@@ -65,6 +65,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="roblox-graph")
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("serve", help="Start the local API server")
+    subparsers.add_parser("mcp", help="Start the read-only MCP server over stdio")
     subparsers.add_parser("stats", help="Print persisted graph counts")
     subparsers.add_parser("doctor", help="Verify database initialization")
     arguments = parser.parse_args()
@@ -72,6 +73,10 @@ def main() -> None:
 
     if arguments.command == "serve":
         uvicorn.run(create_app(settings), host=settings.host, port=settings.port)
+    elif arguments.command == "mcp":
+        from roblox_graph.mcp.server import create_mcp_server
+
+        create_mcp_server(settings).run(transport="stdio")
     else:
         database = Database(settings.database_path)
         database.initialize()
