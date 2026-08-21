@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from roblox_graph.graph.engine import GraphEngine
+from roblox_graph.graph.intelligence import GraphIntelligence
 from roblox_graph.models.edge import Edge
 from roblox_graph.models.node import Node
 from roblox_graph.storage.repositories import GraphRepository
@@ -16,6 +17,7 @@ class GraphTools:
     def __init__(self, repository: GraphRepository) -> None:
         self.repository = repository
         self.graph = GraphEngine(repository)
+        self.intelligence = GraphIntelligence(repository)
 
     def search_project(self, project_id: str, query: str, limit: int = 20) -> dict[str, object]:
         return {
@@ -70,27 +72,10 @@ class GraphTools:
         return self._find_usage(project_id, {"Attribute"}, name)
 
     def get_project_overview(self, project_id: str) -> dict[str, object]:
-        nodes = self.repository.list_nodes(project_id)
-        edges = self.repository.list_edges(project_id)
-        counts: dict[str, int] = {}
-        for node in nodes:
-            counts[node.type] = counts.get(node.type, 0) + 1
-        return {
-            "project_id": project_id,
-            "nodes": len(nodes),
-            "edges": len(edges),
-            "node_types": dict(sorted(counts.items())),
-        }
+        return self.intelligence.overview(project_id)
 
     def get_god_nodes(self, project_id: str, limit: int = 10) -> dict[str, object]:
-        nodes = self.repository.list_nodes(project_id)
-        ranked = sorted(nodes, key=lambda node: (-self.graph.degree(node.id), node.name, node.id))
-        return {
-            "nodes": [
-                self._node(node) | {"degree": self.graph.degree(node.id)}
-                for node in ranked[:limit]
-            ]
-        }
+        return {"nodes": self.intelligence.god_nodes(project_id, limit=limit)}
 
     def _find_usage(
         self, project_id: str, node_types: set[str], name: str | None
@@ -127,4 +112,3 @@ class GraphTools:
     @staticmethod
     def _edge(edge: Edge) -> dict[str, Any]:
         return edge.model_dump(mode="json")
-

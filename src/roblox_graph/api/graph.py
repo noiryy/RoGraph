@@ -22,6 +22,20 @@ def list_projects(request: Request) -> dict[str, object]:
     return {"projects": request.app.state.repository.list_projects()}
 
 
+@router.get("/projects/{project_id}/overview")
+def get_project_overview(request: Request, project_id: str) -> dict[str, object]:
+    return request.app.state.intelligence.overview(project_id)
+
+
+@router.get("/projects/{project_id}/god-nodes")
+def get_god_nodes(
+    request: Request,
+    project_id: str,
+    limit: int = Query(default=10, ge=1, le=100),
+) -> dict[str, object]:
+    return {"nodes": request.app.state.intelligence.god_nodes(project_id, limit=limit)}
+
+
 @router.get("/graph")
 def get_graph(
     request: Request,

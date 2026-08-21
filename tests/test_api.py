@@ -57,6 +57,10 @@ def test_graph_api_search_and_traversal(tmp_path) -> None:
     subgraph = client.get(f"/api/nodes/{controller.id}/subgraph").json()
     assert len(subgraph["nodes"]) == 2
     assert len(subgraph["edges"]) == 1
+    overview = client.get("/api/projects/place:test/overview").json()
+    assert overview["community_count"] == 1
+    assert overview["coupling_indicators"][0]["name"] in {"ShopController", "ShopService"}
+    assert client.get("/api/projects/place:test/god-nodes").json()["nodes"]
 
 
 def test_graph_view_and_projects_endpoint(tmp_path) -> None:

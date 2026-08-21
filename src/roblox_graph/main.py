@@ -17,6 +17,7 @@ from roblox_graph.api.websocket import WebSocketBroadcaster
 from roblox_graph.api.websocket import router as websocket_router
 from roblox_graph.config import Settings
 from roblox_graph.graph.engine import GraphEngine
+from roblox_graph.graph.intelligence import GraphIntelligence
 from roblox_graph.storage.database import Database
 from roblox_graph.storage.repositories import GraphRepository
 from roblox_graph.studio_ingestion import StudioIngestionService
@@ -31,6 +32,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.repository = repository
     app.state.graph = GraphEngine(repository)
+    app.state.intelligence = GraphIntelligence(repository)
     app.state.studio_ingestion = StudioIngestionService(repository)
     app.state.studio_connected = False
     app.state.last_studio_update = None

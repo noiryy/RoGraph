@@ -15,6 +15,8 @@ Phase 2 provides a complete initial Studio-to-graph snapshot path:
 - static analysis for direct `require()`, services, remotes, DataStores, tags, and attributes;
 - a stdio MCP server with project search, script and dependency inspection, path tracing, and
   targeted remote/DataStore/tag/attribute queries;
+- degree and weighted coupling metrics, deterministic relationship communities, and architecture
+  summaries for the graph API, viewer, and MCP tools;
 - a CLI for serving and inspecting the graph.
 
 ## Quick start
