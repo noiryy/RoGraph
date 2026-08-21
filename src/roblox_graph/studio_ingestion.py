@@ -159,7 +159,7 @@ class StudioIngestionService:
 
     @staticmethod
     def _is_architectural(instance: StudioInstance) -> bool:
-        return bool(instance.class_name) and (
+        return bool(instance.name) and bool(instance.class_name) and (
             instance.is_service or instance.class_name in _TYPE_BY_CLASS_NAME
         )
 

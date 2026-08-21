@@ -20,7 +20,8 @@ local architecturalClasses = {
 }
 
 function Scanner.isArchitectural(instance: Instance): boolean
-	return instance.ClassName ~= ""
+	return instance.Name ~= ""
+		and instance.ClassName ~= ""
 		and (instance.Parent == game or architecturalClasses[instance.ClassName] == true)
 end
 

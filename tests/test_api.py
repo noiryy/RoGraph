@@ -71,3 +71,30 @@ def test_graph_view_and_projects_endpoint(tmp_path) -> None:
     assert client.get("/").status_code == 200
     assert "RoGraph" in client.get("/").text
     assert client.get("/api/projects").json()["projects"][0]["name"] == "Test"
+
+
+def test_connected_graph_view_prioritizes_project_anchors_and_relationships(tmp_path) -> None:
+    app = create_app(Settings(database_path=tmp_path / "graph.db"))
+    repository = app.state.repository
+    project = Project(id="place:large", name="Large")
+    repository.upsert_project(project)
+    place = Node.create(project_id=project.id, type="Place", name="Large", path="game")
+    hub = Node.create(project_id=project.id, type="ModuleScript", name="Hub", path="Hub")
+    leaf = Node.create(project_id=project.id, type="ModuleScript", name="Leaf", path="Leaf")
+    for node in (place, hub, leaf):
+        repository.upsert_node(node)
+    repository.upsert_edge(
+        Edge.create(
+            project_id=project.id,
+            source_id=hub.id,
+            target_id=leaf.id,
+            type="REQUIRES",
+        )
+    )
+
+    response = TestClient(app).get(
+        "/api/graph", params={"project_id": project.id, "limit": 2, "order": "connected"}
+    )
+
+    assert response.status_code == 200
+    assert [node["name"] for node in response.json()["nodes"]] == ["Large", "Hub"]

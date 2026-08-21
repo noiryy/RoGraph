@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException, Query, Request
 
 router = APIRouter(prefix="/api", tags=["graph"])
@@ -41,9 +43,14 @@ def get_graph(
     request: Request,
     project_id: str,
     limit: int = Query(default=3_000, ge=1, le=10_000),
+    order: Literal["name", "connected"] = "name",
 ) -> dict[str, object]:
     repository = request.app.state.repository
-    nodes = repository.list_nodes(project_id, limit=limit)
+    nodes = (
+        repository.list_nodes_by_connectivity(project_id, limit=limit)
+        if order == "connected"
+        else repository.list_nodes(project_id, limit=limit)
+    )
     node_ids = {node.id for node in nodes}
     return {
         "nodes": nodes,

@@ -163,6 +163,41 @@ class GraphRepository:
             rows = connection.execute(query, params).fetchall()
         return [self._node_from_row(row) for row in rows]
 
+    def list_nodes_by_connectivity(self, project_id: str, *, limit: int) -> list[Node]:
+        """Return a compact, useful graph-view subset for large projects.
+
+        Place and service nodes anchor the hierarchy. Remaining nodes are ranked
+        by non-containment relationships first, then by total connectivity.
+        """
+        with self.database.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    nodes.*,
+                    COUNT(DISTINCT edges.id) AS total_connections,
+                    COUNT(DISTINCT CASE WHEN edges.type != 'CONTAINS' THEN edges.id END)
+                        AS architectural_connections
+                FROM nodes
+                LEFT JOIN edges
+                    ON edges.source_id = nodes.id OR edges.target_id = nodes.id
+                WHERE nodes.project_id = ?
+                GROUP BY nodes.id
+                ORDER BY
+                    CASE
+                        WHEN nodes.type = 'Place' THEN 0
+                        WHEN nodes.type = 'Service' THEN 1
+                        ELSE 2
+                    END,
+                    architectural_connections DESC,
+                    total_connections DESC,
+                    nodes.name,
+                    nodes.id
+                LIMIT ?
+                """,
+                (project_id, limit),
+            ).fetchall()
+        return [self._node_from_row(row) for row in rows]
+
     def list_projects(self) -> list[Project]:
         with self.database.connect() as connection:
             rows = connection.execute(
