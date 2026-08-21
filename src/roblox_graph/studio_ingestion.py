@@ -95,7 +95,9 @@ class StudioIngestionService:
 
     @staticmethod
     def _is_architectural(instance: StudioInstance) -> bool:
-        return instance.is_service or instance.class_name in _TYPE_BY_CLASS_NAME
+        return bool(instance.class_name) and (
+            instance.is_service or instance.class_name in _TYPE_BY_CLASS_NAME
+        )
 
     @staticmethod
     def _to_node(project_id: str, instance: StudioInstance) -> Node:

@@ -20,7 +20,8 @@ local architecturalClasses = {
 }
 
 local function isArchitectural(instance: Instance): boolean
-	return instance.Parent == game or architecturalClasses[instance.ClassName] == true
+	return instance.ClassName ~= ""
+		and (instance.Parent == game or architecturalClasses[instance.ClassName] == true)
 end
 
 local function record(instance: Instance)
