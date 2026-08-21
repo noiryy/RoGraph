@@ -57,6 +57,40 @@ class GraphRepository:
             )
         return edge
 
+    def replace_project_graph(self, project: Project, nodes: list[Node], edges: list[Edge]) -> None:
+        """Atomically replace one project's graph after a full Studio snapshot."""
+        if any(node.project_id != project.id for node in nodes):
+            raise ValueError("Every node must belong to the snapshot project")
+        if any(edge.project_id != project.id for edge in edges):
+            raise ValueError("Every edge must belong to the snapshot project")
+
+        with self.database.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO projects (id, name, place_id) VALUES (?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET name = excluded.name, place_id = excluded.place_id,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (project.id, project.name, project.place_id),
+            )
+            connection.execute("DELETE FROM nodes WHERE project_id = ?", (project.id,))
+            connection.executemany(
+                """
+                INSERT INTO nodes (
+                    id, project_id, type, name, path, metadata_json, source, source_hash
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [self._node_values(node) for node in nodes],
+            )
+            connection.executemany(
+                """
+                INSERT INTO edges (id, project_id, source_id, target_id, type, metadata_json)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                [self._edge_values(edge) for edge in edges],
+            )
+
     def get_node(self, node_id: str) -> Node | None:
         with self.database.connect() as connection:
             row = connection.execute("SELECT * FROM nodes WHERE id = ?", (node_id,)).fetchone()

@@ -9,10 +9,12 @@ import uvicorn
 from fastapi import FastAPI
 
 from roblox_graph.api.graph import router as graph_router
+from roblox_graph.api.studio import router as studio_router
 from roblox_graph.config import Settings
 from roblox_graph.graph.engine import GraphEngine
 from roblox_graph.storage.database import Database
 from roblox_graph.storage.repositories import GraphRepository
+from roblox_graph.studio_ingestion import StudioIngestionService
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -24,7 +26,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.repository = repository
     app.state.graph = GraphEngine(repository)
+    app.state.studio_ingestion = StudioIngestionService(repository)
+    app.state.studio_connected = False
+    app.state.last_studio_update = None
     app.include_router(graph_router)
+    app.include_router(studio_router)
 
     @app.get("/api/health", tags=["system"])
     def health() -> dict[str, str]:
@@ -32,7 +38,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/status", tags=["system"])
     def status() -> dict[str, object]:
-        return {"studio_connected": False, "last_update": None, **repository.stats()}
+        last_update = app.state.last_studio_update
+        return {
+            "studio_connected": app.state.studio_connected,
+            "last_update": last_update.isoformat() if last_update else None,
+            **repository.stats(),
+        }
 
     return app
 
