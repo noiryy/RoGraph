@@ -3,5 +3,6 @@
 __pycache__/
 .pytest_cache/
 .ruff_cache/
+.playwright-mcp/
 *.py[cod]
 .coverage
