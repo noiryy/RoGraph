@@ -11,6 +11,7 @@ Phase 2 provides a complete initial Studio-to-graph snapshot path:
 - graph traversal and centrality operations independent of HTTP or MCP;
 - a local FastAPI service with health, status, graph, node, and neighbor endpoints;
 - a read-only Roblox Studio plugin and `POST /api/studio/snapshot` bridge;
+- static analysis for direct `require()`, services, remotes, DataStores, tags, and attributes;
 - a CLI for serving and inspecting the graph.
 
 ## Quick start
@@ -28,4 +29,4 @@ uv run roblox-graph doctor
 uv run pytest
 ```
 
-To index a place, install the [Studio plugin](roblox-plugin/README.md), then click **RoGraph → Index Project**. The current bridge uploads full snapshots; analyzer-driven incremental updates, the web graph, live updates, and MCP transport remain later phases. See [docs/architecture.md](docs/architecture.md) for the boundaries.
+To index a place, install the [Studio plugin](roblox-plugin/README.md), then click **RoGraph → Index Project**. The bridge analyzes direct, statically resolvable patterns and records line numbers and confidence on generated edges. Dynamic expressions are returned as snapshot warnings rather than guessed. Incremental updates, the web graph, live updates, and MCP transport remain later phases. See [docs/architecture.md](docs/architecture.md) for the boundaries.

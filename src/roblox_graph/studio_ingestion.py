@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
+from roblox_graph.analysis.runner import AnalyzerRunner
 from roblox_graph.models.edge import Edge
 from roblox_graph.models.node import Node
 from roblox_graph.models.project import Project
@@ -29,13 +30,17 @@ class IngestionResult:
     project: Project
     nodes: list[Node]
     edges: list[Edge]
+    warnings: list[str]
 
 
 class StudioIngestionService:
     """Ingest full snapshots; incremental events are intentionally a later phase."""
 
-    def __init__(self, repository: GraphRepository) -> None:
+    def __init__(
+        self, repository: GraphRepository, analyzers: AnalyzerRunner | None = None
+    ) -> None:
         self.repository = repository
+        self.analyzers = analyzers or AnalyzerRunner()
 
     def ingest_snapshot(self, snapshot: StudioSnapshot) -> IngestionResult:
         project = Project(
@@ -77,8 +82,16 @@ class StudioIngestionService:
                     )
                 )
 
+        analysis = self.analyzers.analyze_scripts(project.id, nodes)
+        nodes = self._deduplicate_nodes([*nodes, *analysis.nodes])
+        edges = self._deduplicate_edges([*edges, *analysis.edges])
         self.repository.replace_project_graph(project, nodes, edges)
-        return IngestionResult(project=project, nodes=nodes, edges=edges)
+        return IngestionResult(
+            project=project,
+            nodes=nodes,
+            edges=edges,
+            warnings=analysis.warnings,
+        )
 
     @staticmethod
     def _is_architectural(instance: StudioInstance) -> bool:
@@ -104,3 +117,11 @@ class StudioIngestionService:
             source=instance.source,
             source_hash=source_hash,
         )
+
+    @staticmethod
+    def _deduplicate_nodes(nodes: list[Node]) -> list[Node]:
+        return list({node.id: node for node in nodes}.values())
+
+    @staticmethod
+    def _deduplicate_edges(edges: list[Edge]) -> list[Edge]:
+        return list({edge.id: edge for edge in edges}.values())

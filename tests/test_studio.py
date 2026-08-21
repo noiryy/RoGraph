@@ -20,6 +20,7 @@ def test_snapshot_ingests_architectural_instances_and_replaces_stale_nodes(tmp_p
         "project_id": "place:123",
         "nodes_indexed": 6,
         "edges_indexed": 5,
+        "warnings": [],
     }
     status = client.get("/api/status").json()
     assert status["studio_connected"] is True

@@ -20,4 +20,5 @@ def post_snapshot(snapshot: StudioSnapshot, request: Request) -> dict[str, objec
         "project_id": result.project.id,
         "nodes_indexed": len(result.nodes),
         "edges_indexed": len(result.edges),
+        "warnings": result.warnings,
     }
