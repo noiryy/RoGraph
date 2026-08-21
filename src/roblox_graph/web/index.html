@@ -4,16 +4,27 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>RoGraph</title>
+    <script>
+      (() => {
+        try {
+          const savedTheme = localStorage.getItem('rograph.theme');
+          document.documentElement.dataset.theme = savedTheme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        } catch (_) { document.documentElement.dataset.theme = 'dark'; }
+      })();
+    </script>
     <link rel="stylesheet" href="/static/styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.33.1/dist/cytoscape.min.js"></script>
   </head>
   <body>
     <main class="app-shell">
       <header class="topbar">
-        <a class="brand" href="/" aria-label="RoGraph home"><span class="brand-mark">R</span><span>RoGraph</span></a>
+        <a class="brand" href="/" aria-label="RoGraph home"><img src="/static/rograph-logo-red-v1.png" alt="" class="brand-logo" /><span>RoGraph</span></a>
         <label class="project-picker"><span>PROJECT</span><select id="project-select" aria-label="Project"></select></label>
         <label class="search"><span class="search-icon">⌕</span><input id="search-input" type="search" placeholder="Search scripts, remotes, paths…" autocomplete="off" /></label>
-        <button class="icon-button" id="fit-button" title="Fit graph" aria-label="Fit graph">⛶</button>
+        <div class="topbar-actions">
+          <button class="icon-button" id="theme-toggle" title="Switch color theme" aria-label="Switch color theme"><span id="theme-icon" aria-hidden="true">☼</span></button>
+          <button class="icon-button" id="fit-button" title="Fit graph" aria-label="Fit graph">⛶</button>
+        </div>
       </header>
 
       <aside class="sidebar">
