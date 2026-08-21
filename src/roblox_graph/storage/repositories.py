@@ -120,6 +120,22 @@ class GraphRepository:
             ).fetchall()
         return [self._edge_from_row(row) for row in rows]
 
+    def search_nodes(self, project_id: str, query: str, *, limit: int) -> list[Node]:
+        pattern = f"%{query.lower()}%"
+        with self.database.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM nodes
+                WHERE project_id = ?
+                  AND (LOWER(name) LIKE ? OR LOWER(COALESCE(path, '')) LIKE ?
+                       OR LOWER(type) LIKE ? OR LOWER(COALESCE(source, '')) LIKE ?)
+                ORDER BY CASE WHEN LOWER(name) = ? THEN 0 ELSE 1 END, name, id
+                LIMIT ?
+                """,
+                (project_id, pattern, pattern, pattern, pattern, query.lower(), limit),
+            ).fetchall()
+        return [self._node_from_row(row) for row in rows]
+
     def list_incident_edges(self, node_id: str) -> list[Edge]:
         with self.database.connect() as connection:
             rows = connection.execute(

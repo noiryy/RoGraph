@@ -33,6 +33,33 @@ class GraphEngine:
     def get_dependents(self, node_id: str, *, depth: int = 1) -> list[Node]:
         return self._traverse(node_id, direction="incoming", depth=depth)
 
+    def search_project(self, project_id: str, query: str, *, limit: int = 20) -> list[Node]:
+        if not query.strip():
+            return []
+        return self.repository.search_nodes(project_id, query.strip(), limit=max(1, limit))
+
+    def get_related(self, node_id: str, *, limit: int = 25) -> list[Node]:
+        """Return direct neighbors ranked by relationship strength and degree."""
+        weights = {
+            "REQUIRES": 3,
+            "USES_DATASTORE": 3,
+            "INVOKES": 3,
+            "CALLS": 2,
+            "FIRES": 2,
+            "LISTENS_TO": 2,
+            "REFERENCES": 1,
+            "CONTAINS": 1,
+        }
+        scores: dict[str, int] = {}
+        for edge in self.repository.list_incident_edges(node_id):
+            other = edge.target_id if edge.source_id == node_id else edge.source_id
+            scores[other] = scores.get(other, 0) + weights.get(edge.type, 1)
+        ranked = sorted(
+            scores,
+            key=lambda candidate: (-scores[candidate], -self.degree(candidate), candidate),
+        )
+        return [node for candidate in ranked[:limit] if (node := self.get_node(candidate))]
+
     def get_subgraph(self, node_id: str, *, depth: int = 1) -> tuple[list[Node], list[Edge]]:
         nodes = [self.get_node(node_id)] + self._traverse(node_id, direction="both", depth=depth)
         selected = {node.id for node in nodes if node}
