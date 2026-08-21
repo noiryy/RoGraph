@@ -44,6 +44,8 @@ def get_graph(
     project_id: str,
     limit: int = Query(default=3_000, ge=1, le=10_000),
     order: Literal["name", "connected"] = "name",
+    edge_limit: int | None = Query(default=None, ge=1, le=20_000),
+    include_source: bool = False,
 ) -> dict[str, object]:
     repository = request.app.state.repository
     nodes = (
@@ -52,13 +54,19 @@ def get_graph(
         else repository.list_nodes(project_id, limit=limit)
     )
     node_ids = {node.id for node in nodes}
+    edges = [
+        edge
+        for edge in repository.list_edges(project_id)
+        if edge.source_id in node_ids and edge.target_id in node_ids
+    ]
+    if edge_limit is not None:
+        edges.sort(key=lambda edge: (edge.type == "CONTAINS", edge.id))
+        edges = edges[:edge_limit]
     return {
-        "nodes": nodes,
-        "edges": [
-            edge
-            for edge in repository.list_edges(project_id)
-            if edge.source_id in node_ids and edge.target_id in node_ids
-        ],
+        "nodes": nodes
+        if include_source
+        else [node.model_copy(update={"source": None}) for node in nodes],
+        "edges": edges,
     }
 
 

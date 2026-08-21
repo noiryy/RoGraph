@@ -63,7 +63,9 @@ def test_snapshot_accepts_roblox_empty_attribute_tables_and_skips_empty_class_na
     response = client.post("/api/studio/snapshot", json=snapshot)
 
     assert response.status_code == 202
-    graph = client.get("/api/graph", params={"project_id": "place:123"}).json()
+    graph = client.get(
+        "/api/graph", params={"project_id": "place:123", "include_source": True}
+    ).json()
     assert all(node["name"] != "FilteredSelection" for node in graph["nodes"])
 
 
@@ -121,7 +123,9 @@ def test_studio_events_update_and_remove_a_node_with_websocket_notification(tmp_
         assert removed.json() == {"event_type": "node_removed", "warnings": []}
         assert socket.receive_json() == {"type": "node_removed", "project_id": "place:123"}
 
-    graph = client.get("/api/graph", params={"project_id": "place:123"}).json()
+    graph = client.get(
+        "/api/graph", params={"project_id": "place:123", "include_source": True}
+    ).json()
     changed = next(node for node in graph["nodes"] if node["name"] == "Inventory")
     assert changed["source"] == "return { MaxItems = 250 }"
     assert all(node["name"] != "Purchase" for node in graph["nodes"])
