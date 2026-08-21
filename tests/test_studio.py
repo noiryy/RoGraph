@@ -67,6 +67,30 @@ def test_snapshot_accepts_roblox_empty_attribute_tables_and_skips_empty_class_na
     assert all(node["name"] != "FilteredSelection" for node in graph["nodes"])
 
 
+def test_snapshot_accepts_and_skips_unnamed_roblox_instances(tmp_path: Path) -> None:
+    app = create_app(Settings(database_path=tmp_path / "graph.db"))
+    client = TestClient(app)
+    fixture = Path(__file__).parent / "fixtures" / "simple_game.json"
+    snapshot = json.loads(fixture.read_text(encoding="utf-8"))
+    snapshot["instances"].append(
+        {
+            "id": "unnamed-model",
+            "name": "",
+            "className": "Model",
+            "path": "ReplicatedStorage.",
+            "parentPath": "ReplicatedStorage",
+            "attributes": [],
+            "tags": [],
+        }
+    )
+
+    response = client.post("/api/studio/snapshot", json=snapshot)
+
+    assert response.status_code == 202
+    graph = client.get("/api/graph", params={"project_id": "place:123"}).json()
+    assert all(node["name"] for node in graph["nodes"])
+
+
 def test_studio_events_update_and_remove_a_node_with_websocket_notification(tmp_path: Path) -> None:
     app = create_app(Settings(database_path=tmp_path / "graph.db"))
     client = TestClient(app)

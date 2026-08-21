@@ -14,7 +14,10 @@ class StudioProject(BaseModel):
 
 
 class StudioInstance(BaseModel):
-    name: str = Field(min_length=1, max_length=256)
+    # Roblox permits unnamed instances.  They cannot be represented as unique
+    # graph nodes, but accepting them here lets ingestion safely skip them
+    # instead of rejecting the entire Studio snapshot.
+    name: str = Field(max_length=256)
     class_name: str = Field(max_length=256, alias="className")
     path: str = Field(min_length=1, max_length=2048)
     parent_path: str | None = Field(default=None, max_length=2048, alias="parentPath")

@@ -1,6 +1,9 @@
 const palette = { Script: '#ff676f', LocalScript: '#ff8590', ModuleScript: '#fb7185', RemoteEvent: '#ff9d65', RemoteFunction: '#ffc16b', Service: '#f3c85a', DataStore: '#df6bab', OrderedDataStore: '#df6bab', CollectionServiceTag: '#c9a6ff', Attribute: '#e87fae', Folder: '#b99ba1', Model: '#c9a37b', Place: '#ffeff0', RobloxInstance: '#b99ba1' };
 const THEME_STORAGE_KEY = 'rograph.theme';
+const LARGE_GRAPH_THRESHOLD = 700;
+const OVERVIEW_NODE_LIMIT = 500;
 let cy; let graphData = { nodes: [], edges: [] }; let activeTypes = new Set(); let activeEdges = new Set();
+let showingOverview = false;
 const el = (id) => document.getElementById(id);
 
 async function api(path) { const response = await fetch(path); if (!response.ok) throw new Error(await response.text()); return response.json(); }
@@ -25,8 +28,9 @@ function applyFilters() {
 }
 function makeGraph() {
   const theme = graphTheme();
+  const compact = showingOverview;
   const elements = [
-    ...graphData.nodes.map((node) => ({ data: { ...node, label: node.name, color: palette[node.type] || '#91a0b9' } })),
+    ...graphData.nodes.map((node) => ({ data: { ...node, label: compact ? '' : node.name, color: palette[node.type] || '#91a0b9' } })),
     ...graphData.edges.map((edge) => ({ data: { ...edge, source: edge.source_id, target: edge.target_id } })),
   ];
   if (cy) cy.destroy();
@@ -35,7 +39,9 @@ function makeGraph() {
     { selector: 'node[type = "ModuleScript"]', style: { shape:'round-rectangle' } }, { selector: 'node[type = "RemoteEvent"], node[type = "RemoteFunction"]', style: { shape:'diamond' } }, { selector: 'node[type = "Service"]', style: { shape:'hexagon' } },
     { selector: 'edge', style: { width:1, 'line-color':theme.edge, 'target-arrow-color':theme.edge, 'target-arrow-shape':'triangle', 'curve-style':'bezier', opacity:.62 } },
     { selector: '.focused', style: { 'border-width':3, 'border-color':theme.label, 'z-index':9 } }, { selector: '.neighbour', style: { 'border-width':2, 'border-color':theme.accent, opacity:1 } }, { selector: '.faded', style: { opacity:.11 } }, { selector: '.selected-edge', style: { width:2.5, 'line-color':theme.accent, 'target-arrow-color':theme.accent, opacity:1 } },
-  ], layout: { name:'cose', animate:false, idealEdgeLength:100, nodeRepulsion:6000, gravity:.14, padding:46 } });
+  ], layout: compact
+    ? { name:'grid', animate:false, padding:46, avoidOverlap:true, condense:true }
+    : { name:'cose', animate:false, idealEdgeLength:100, nodeRepulsion:6000, gravity:.14, padding:46 } });
   cy.nodes().forEach((node) => node.data('degree', node.degree()));
   cy.on('tap', 'node', (event) => focusNode(event.target)); cy.on('mouseover', 'node', (event) => highlight(event.target)); cy.on('mouseout', 'node', () => clearHighlight()); cy.on('tap', (event) => { if (event.target === cy) { clearHighlight(); el('detail-panel').classList.add('is-hidden'); } });
 }
@@ -47,9 +53,22 @@ function focusNode(node) {
   const relationships = [...incoming, ...outgoing].slice(0, 20).map((edge) => { const other = edge.source().id() === node.id() ? edge.target() : edge.source(); return `<li><small>${escape(edge.data('type'))}</small>${escape(other.data('name'))}</li>`; }).join(''); el('relationships').innerHTML = relationships || '<li>No direct relationships</li>';
   const source = data.source || ''; el('source-section').style.display = source ? 'block' : 'none'; el('source-preview').textContent = source.slice(0, 1400); el('detail-panel').classList.remove('is-hidden');
 }
-function runLayout() { if (!cy) return; const name = el('layout-select').value; cy.layout({ name, animate:true, animationDuration:350, padding:45, spacingFactor:1.1, avoidOverlap:true, directed:true, roots: cy.nodes().filter((node) => node.data('type') === 'Place') }).run(); }
+function runLayout() { if (!cy) return; const selected = el('layout-select').value; const name = showingOverview && selected === 'cose' ? 'grid' : selected; cy.layout({ name, animate:!showingOverview, animationDuration:350, padding:45, spacingFactor:1.1, avoidOverlap:true, directed:true, roots: cy.nodes().filter((node) => node.data('type') === 'Place') }).run(); }
 async function search() { const query = el('search-input').value.trim(); const projectId = el('project-select').value; if (!query || !projectId) return; const data = await api(`/api/search?project_id=${encodeURIComponent(projectId)}&query=${encodeURIComponent(query)}`); if (data.results[0] && cy) focusNode(cy.getElementById(data.results[0].id)); }
-async function loadProject(projectId) { if (!projectId) { setEmpty(true); return; } const [data, overview] = await Promise.all([api(`/api/graph?project_id=${encodeURIComponent(projectId)}`), api(`/api/projects/${encodeURIComponent(projectId)}/overview`)]); graphData = data; setEmpty(!data.nodes.length, data.nodes.length ? '' : 'This project has no architectural nodes yet.'); populateFilters(); makeGraph(); el('graph-stats').textContent = `${data.nodes.length.toLocaleString()} nodes · ${data.edges.length.toLocaleString()} edges · ${overview.community_count} areas`; }
+async function loadProject(projectId) {
+  if (!projectId) { setEmpty(true); return; }
+  const overview = await api(`/api/projects/${encodeURIComponent(projectId)}/overview`);
+  showingOverview = overview.nodes > LARGE_GRAPH_THRESHOLD;
+  const params = new URLSearchParams({ project_id: projectId });
+  if (showingOverview) { params.set('limit', OVERVIEW_NODE_LIMIT); params.set('order', 'connected'); }
+  const data = await api(`/api/graph?${params}`);
+  graphData = data;
+  setEmpty(!data.nodes.length, data.nodes.length ? '' : 'This project has no architectural nodes yet.');
+  populateFilters(); makeGraph();
+  el('graph-stats').textContent = showingOverview
+    ? `Showing ${data.nodes.length.toLocaleString()} of ${overview.nodes.toLocaleString()} nodes · optimized overview · ${overview.community_count} areas`
+    : `${data.nodes.length.toLocaleString()} nodes · ${data.edges.length.toLocaleString()} edges · ${overview.community_count} areas`;
+}
 function connectUpdates() { const protocol = location.protocol === 'https:' ? 'wss' : 'ws'; const socket = new WebSocket(`${protocol}://${location.host}/ws/graph`); socket.onmessage = async (message) => { const event = JSON.parse(message.data); if (event.project_id === el('project-select').value) await loadProject(event.project_id); }; socket.onclose = () => window.setTimeout(connectUpdates, 1_000); }
 async function init() {
   try {
