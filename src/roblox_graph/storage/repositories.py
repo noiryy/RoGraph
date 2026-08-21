@@ -113,6 +113,22 @@ class GraphRepository:
             rows = connection.execute(query, params).fetchall()
         return [self._node_from_row(row) for row in rows]
 
+    def list_projects(self) -> list[Project]:
+        with self.database.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM projects ORDER BY updated_at DESC, name, id"
+            ).fetchall()
+        return [
+            Project(
+                id=row["id"],
+                name=row["name"],
+                place_id=row["place_id"],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+            )
+            for row in rows
+        ]
+
     def list_edges(self, project_id: str) -> list[Edge]:
         with self.database.connect() as connection:
             rows = connection.execute(

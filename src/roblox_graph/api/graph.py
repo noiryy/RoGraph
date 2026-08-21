@@ -17,6 +17,11 @@ def _get_existing_node(request: Request, node_id: str) -> object:
     return node
 
 
+@router.get("/projects")
+def list_projects(request: Request) -> dict[str, object]:
+    return {"projects": request.app.state.repository.list_projects()}
+
+
 @router.get("/graph")
 def get_graph(
     request: Request,

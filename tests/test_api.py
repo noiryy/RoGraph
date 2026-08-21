@@ -57,3 +57,13 @@ def test_graph_api_search_and_traversal(tmp_path) -> None:
     subgraph = client.get(f"/api/nodes/{controller.id}/subgraph").json()
     assert len(subgraph["nodes"]) == 2
     assert len(subgraph["edges"]) == 1
+
+
+def test_graph_view_and_projects_endpoint(tmp_path) -> None:
+    app = create_app(Settings(database_path=tmp_path / "graph.db"))
+    app.state.repository.upsert_project(Project(id="place:test", name="Test"))
+    client = TestClient(app)
+
+    assert client.get("/").status_code == 200
+    assert "RoGraph" in client.get("/").text
+    assert client.get("/api/projects").json()["projects"][0]["name"] == "Test"

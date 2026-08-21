@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from roblox_graph.api.graph import router as graph_router
 from roblox_graph.api.studio import router as studio_router
@@ -31,6 +34,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.last_studio_update = None
     app.include_router(graph_router)
     app.include_router(studio_router)
+    web_dir = Path(__file__).with_name("web")
+    app.mount("/static", StaticFiles(directory=web_dir), name="static")
+
+    @app.get("/", include_in_schema=False)
+    def graph_view() -> FileResponse:
+        return FileResponse(web_dir / "index.html")
 
     @app.get("/api/health", tags=["system"])
     def health() -> dict[str, str]:
