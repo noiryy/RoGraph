@@ -13,4 +13,4 @@ The first HTTP request may ask permission for the plugin to access `127.0.0.1`. 
 
 ## Current scan boundary
 
-The snapshot includes root services, folders, models, scripts, remotes, bindables, attributes, tags, and readable script source. Individual parts and other low-level instances are intentionally excluded to keep the graph architectural.
+The snapshot includes root services, folders, models, scripts, remotes, bindables, attributes, tags, and readable script source. After a successful initial index, changes to these meaningful entities are sent after a 750ms debounce. Individual parts and other low-level instances are intentionally excluded to keep the graph architectural.

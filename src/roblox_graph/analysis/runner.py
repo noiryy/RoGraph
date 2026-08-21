@@ -41,3 +41,15 @@ class AnalyzerRunner:
             for analyzer in self.analyzers:
                 result.extend(analyzer.analyze(script, context))
         return result
+
+    def analyze_script(self, project_id: str, script: Node, nodes: list[Node]) -> AnalysisResult:
+        context = ProjectContext(
+            project_id=project_id,
+            nodes_by_path={node.path: node for node in nodes if node.path},
+        )
+        result = AnalysisResult()
+        if script.type not in {"Script", "LocalScript", "ModuleScript"}:
+            return result
+        for analyzer in self.analyzers:
+            result.extend(analyzer.analyze(script, context))
+        return result

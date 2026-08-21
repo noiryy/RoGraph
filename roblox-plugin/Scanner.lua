@@ -19,12 +19,12 @@ local architecturalClasses = {
 	Model = true,
 }
 
-local function isArchitectural(instance: Instance): boolean
+function Scanner.isArchitectural(instance: Instance): boolean
 	return instance.ClassName ~= ""
 		and (instance.Parent == game or architecturalClasses[instance.ClassName] == true)
 end
 
-local function record(instance: Instance)
+function Scanner.record(instance: Instance)
 	local tags: {string} = {}
 	local tagsOk, result = pcall(function()
 		return CollectionService:GetTags(instance)
@@ -46,21 +46,25 @@ local function record(instance: Instance)
 	}
 end
 
+function Scanner.project()
+	local placeId = game.PlaceId ~= 0 and tostring(game.PlaceId) or nil
+	return {
+		id = placeId and "place:" .. placeId or "studio:" .. game.Name,
+		name = game.Name,
+		place_id = placeId,
+	}
+end
+
 function Scanner.snapshot()
 	local instances = {}
 	for _, instance in game:GetDescendants() do
-		if isArchitectural(instance) then
-			table.insert(instances, record(instance))
+		if Scanner.isArchitectural(instance) then
+			table.insert(instances, Scanner.record(instance))
 		end
 	end
 
-	local placeId = game.PlaceId ~= 0 and tostring(game.PlaceId) or nil
 	return {
-		project = {
-			id = placeId and "place:" .. placeId or "studio:" .. game.Name,
-			name = game.Name,
-			place_id = placeId,
-		},
+		project = Scanner.project(),
 		instances = instances,
 	}
 end

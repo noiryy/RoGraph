@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class StudioProject(BaseModel):
@@ -34,3 +34,18 @@ class StudioInstance(BaseModel):
 class StudioSnapshot(BaseModel):
     project: StudioProject
     instances: list[StudioInstance] = Field(default_factory=list, max_length=20_000)
+
+
+class StudioEvent(BaseModel):
+    project_id: str = Field(min_length=1, max_length=256)
+    kind: Literal["upsert", "remove"]
+    instance: StudioInstance | None = None
+    path: str | None = Field(default=None, max_length=2048)
+
+    @model_validator(mode="after")
+    def validate_payload(self) -> StudioEvent:
+        if self.kind == "upsert" and self.instance is None:
+            raise ValueError("upsert events require an instance")
+        if self.kind == "remove" and not self.path:
+            raise ValueError("remove events require a path")
+        return self

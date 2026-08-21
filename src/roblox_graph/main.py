@@ -13,6 +13,8 @@ from fastapi.staticfiles import StaticFiles
 
 from roblox_graph.api.graph import router as graph_router
 from roblox_graph.api.studio import router as studio_router
+from roblox_graph.api.websocket import WebSocketBroadcaster
+from roblox_graph.api.websocket import router as websocket_router
 from roblox_graph.config import Settings
 from roblox_graph.graph.engine import GraphEngine
 from roblox_graph.storage.database import Database
@@ -32,8 +34,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.studio_ingestion = StudioIngestionService(repository)
     app.state.studio_connected = False
     app.state.last_studio_update = None
+    app.state.broadcaster = WebSocketBroadcaster()
     app.include_router(graph_router)
     app.include_router(studio_router)
+    app.include_router(websocket_router)
     web_dir = Path(__file__).with_name("web")
     app.mount("/static", StaticFiles(directory=web_dir), name="static")
 
