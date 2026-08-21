@@ -4,15 +4,23 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from roblox_graph.api.graph import router as graph_router
+from roblox_graph.api.studio import router as studio_router
+from roblox_graph.api.websocket import WebSocketBroadcaster
+from roblox_graph.api.websocket import router as websocket_router
 from roblox_graph.config import Settings
 from roblox_graph.graph.engine import GraphEngine
+from roblox_graph.graph.intelligence import GraphIntelligence
 from roblox_graph.storage.database import Database
 from roblox_graph.storage.repositories import GraphRepository
+from roblox_graph.studio_ingestion import StudioIngestionService
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -24,7 +32,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.repository = repository
     app.state.graph = GraphEngine(repository)
+    app.state.intelligence = GraphIntelligence(repository)
+    app.state.studio_ingestion = StudioIngestionService(repository)
+    app.state.studio_connected = False
+    app.state.last_studio_update = None
+    app.state.broadcaster = WebSocketBroadcaster()
     app.include_router(graph_router)
+    app.include_router(studio_router)
+    app.include_router(websocket_router)
+    web_dir = Path(__file__).with_name("web")
+    app.mount("/static", StaticFiles(directory=web_dir), name="static")
+
+    @app.get("/", include_in_schema=False)
+    def graph_view() -> FileResponse:
+        return FileResponse(web_dir / "index.html")
 
     @app.get("/api/health", tags=["system"])
     def health() -> dict[str, str]:
@@ -32,7 +53,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/status", tags=["system"])
     def status() -> dict[str, object]:
-        return {"studio_connected": False, "last_update": None, **repository.stats()}
+        last_update = app.state.last_studio_update
+        return {
+            "studio_connected": app.state.studio_connected,
+            "last_update": last_update.isoformat() if last_update else None,
+            **repository.stats(),
+        }
 
     return app
 
@@ -41,6 +67,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="roblox-graph")
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("serve", help="Start the local API server")
+    subparsers.add_parser("mcp", help="Start the read-only MCP server over stdio")
     subparsers.add_parser("stats", help="Print persisted graph counts")
     subparsers.add_parser("doctor", help="Verify database initialization")
     arguments = parser.parse_args()
@@ -48,6 +75,10 @@ def main() -> None:
 
     if arguments.command == "serve":
         uvicorn.run(create_app(settings), host=settings.host, port=settings.port)
+    elif arguments.command == "mcp":
+        from roblox_graph.mcp.server import create_mcp_server
+
+        create_mcp_server(settings).run(transport="stdio")
     else:
         database = Database(settings.database_path)
         database.initialize()

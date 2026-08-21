@@ -1,0 +1,66 @@
+{
+  "project": {
+    "id": "place:123",
+    "name": "TestArena",
+    "place_id": "123"
+  },
+  "instances": [
+    {
+      "id": "workspace",
+      "name": "Workspace",
+      "className": "Workspace",
+      "path": "Workspace",
+      "parentPath": "game",
+      "isService": true,
+      "attributes": {},
+      "tags": []
+    },
+    {
+      "id": "replicated-storage",
+      "name": "ReplicatedStorage",
+      "className": "ReplicatedStorage",
+      "path": "ReplicatedStorage",
+      "parentPath": "game",
+      "isService": true,
+      "attributes": {},
+      "tags": []
+    },
+    {
+      "id": "modules",
+      "name": "Modules",
+      "className": "Folder",
+      "path": "ReplicatedStorage.Modules",
+      "parentPath": "ReplicatedStorage",
+      "attributes": {},
+      "tags": []
+    },
+    {
+      "id": "inventory",
+      "name": "Inventory",
+      "className": "ModuleScript",
+      "path": "ReplicatedStorage.Modules.Inventory",
+      "parentPath": "ReplicatedStorage.Modules",
+      "source": "return { MaxItems = 100 }",
+      "attributes": { "Version": 1 },
+      "tags": ["Shared"]
+    },
+    {
+      "id": "purchase-remote",
+      "name": "Purchase",
+      "className": "RemoteEvent",
+      "path": "ReplicatedStorage.Purchase",
+      "parentPath": "ReplicatedStorage",
+      "attributes": {},
+      "tags": []
+    },
+    {
+      "id": "ignored-part",
+      "name": "UnimportantPart",
+      "className": "Part",
+      "path": "Workspace.UnimportantPart",
+      "parentPath": "Workspace",
+      "attributes": {},
+      "tags": []
+    }
+  ]
+}

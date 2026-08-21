@@ -57,6 +57,90 @@ class GraphRepository:
             )
         return edge
 
+    def replace_project_graph(self, project: Project, nodes: list[Node], edges: list[Edge]) -> None:
+        """Atomically replace one project's graph after a full Studio snapshot."""
+        if any(node.project_id != project.id for node in nodes):
+            raise ValueError("Every node must belong to the snapshot project")
+        if any(edge.project_id != project.id for edge in edges):
+            raise ValueError("Every edge must belong to the snapshot project")
+
+        with self.database.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO projects (id, name, place_id) VALUES (?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET name = excluded.name, place_id = excluded.place_id,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (project.id, project.name, project.place_id),
+            )
+            connection.execute("DELETE FROM nodes WHERE project_id = ?", (project.id,))
+            connection.executemany(
+                """
+                INSERT INTO nodes (
+                    id, project_id, type, name, path, metadata_json, source, source_hash
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [self._node_values(node) for node in nodes],
+            )
+            connection.executemany(
+                """
+                INSERT INTO edges (id, project_id, source_id, target_id, type, metadata_json)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                [self._edge_values(edge) for edge in edges],
+            )
+
+    def replace_node_analysis(self, node: Node, nodes: list[Node], edges: list[Edge]) -> None:
+        """Replace one node's outgoing relationships while retaining the rest of the graph."""
+        with self.database.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO nodes (
+                    id, project_id, type, name, path, metadata_json, source, source_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET type = excluded.type, name = excluded.name,
+                    path = excluded.path, metadata_json = excluded.metadata_json,
+                    source = excluded.source, source_hash = excluded.source_hash,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                self._node_values(node),
+            )
+            connection.execute("DELETE FROM edges WHERE source_id = ?", (node.id,))
+            connection.execute(
+                "DELETE FROM edges WHERE target_id = ? AND type = 'CONTAINS'", (node.id,)
+            )
+            connection.executemany(
+                """
+                INSERT INTO nodes (
+                    id, project_id, type, name, path, metadata_json, source, source_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET metadata_json = excluded.metadata_json,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                [self._node_values(value) for value in nodes],
+            )
+            connection.executemany(
+                """
+                INSERT INTO edges (id, project_id, source_id, target_id, type, metadata_json)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET metadata_json = excluded.metadata_json,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                [self._edge_values(edge) for edge in edges],
+            )
+
+    def remove_node_at_path(self, project_id: str, path: str) -> Node | None:
+        node = self.get_node_by_path(project_id, path)
+        if node is None:
+            return None
+        with self.database.connect() as connection:
+            connection.execute(
+                "DELETE FROM nodes WHERE project_id = ? AND (path = ? OR path LIKE ?)",
+                (project_id, path, f"{path}.%"),
+            )
+        return node
+
     def get_node(self, node_id: str) -> Node | None:
         with self.database.connect() as connection:
             row = connection.execute("SELECT * FROM nodes WHERE id = ?", (node_id,)).fetchone()
@@ -79,12 +163,44 @@ class GraphRepository:
             rows = connection.execute(query, params).fetchall()
         return [self._node_from_row(row) for row in rows]
 
+    def list_projects(self) -> list[Project]:
+        with self.database.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM projects ORDER BY updated_at DESC, name, id"
+            ).fetchall()
+        return [
+            Project(
+                id=row["id"],
+                name=row["name"],
+                place_id=row["place_id"],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+            )
+            for row in rows
+        ]
+
     def list_edges(self, project_id: str) -> list[Edge]:
         with self.database.connect() as connection:
             rows = connection.execute(
                 "SELECT * FROM edges WHERE project_id = ? ORDER BY id", (project_id,)
             ).fetchall()
         return [self._edge_from_row(row) for row in rows]
+
+    def search_nodes(self, project_id: str, query: str, *, limit: int) -> list[Node]:
+        pattern = f"%{query.lower()}%"
+        with self.database.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM nodes
+                WHERE project_id = ?
+                  AND (LOWER(name) LIKE ? OR LOWER(COALESCE(path, '')) LIKE ?
+                       OR LOWER(type) LIKE ? OR LOWER(COALESCE(source, '')) LIKE ?)
+                ORDER BY CASE WHEN LOWER(name) = ? THEN 0 ELSE 1 END, name, id
+                LIMIT ?
+                """,
+                (project_id, pattern, pattern, pattern, pattern, query.lower(), limit),
+            ).fetchall()
+        return [self._node_from_row(row) for row in rows]
 
     def list_incident_edges(self, node_id: str) -> list[Edge]:
         with self.database.connect() as connection:

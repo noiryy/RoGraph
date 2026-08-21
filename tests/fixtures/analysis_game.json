@@ -1,0 +1,12 @@
+{
+  "project": {"id": "place:456", "name": "AnalyzerArena", "place_id": "456"},
+  "instances": [
+    {"name": "ReplicatedStorage", "className": "ReplicatedStorage", "path": "ReplicatedStorage", "parentPath": "game", "isService": true},
+    {"name": "ServerScriptService", "className": "ServerScriptService", "path": "ServerScriptService", "parentPath": "game", "isService": true},
+    {"name": "DataStoreService", "className": "DataStoreService", "path": "DataStoreService", "parentPath": "game", "isService": true},
+    {"name": "CollectionService", "className": "CollectionService", "path": "CollectionService", "parentPath": "game", "isService": true},
+    {"name": "InventoryConfig", "className": "ModuleScript", "path": "ServerScriptService.InventoryConfig", "parentPath": "ServerScriptService", "source": "return {}"},
+    {"name": "Purchase", "className": "RemoteEvent", "path": "ReplicatedStorage.Purchase", "parentPath": "ReplicatedStorage"},
+    {"name": "InventoryService", "className": "Script", "path": "ServerScriptService.InventoryService", "parentPath": "ServerScriptService", "source": "local ReplicatedStorage = game:GetService(\"ReplicatedStorage\")\nlocal DataStoreService = game:GetService(\"DataStoreService\")\nlocal CollectionService = game:GetService(\"CollectionService\")\nlocal Config = require(script.Parent.InventoryConfig)\nlocal playerData = DataStoreService:GetDataStore(\"PlayerData\")\nplayerData:GetAsync(\"42\")\nplayerData:SetAsync(\"42\", {})\nCollectionService:GetTagged(\"Enemy\")\nscript:GetAttribute(\"Version\")\nscript:SetAttribute(\"Version\", 1)\nReplicatedStorage.Purchase:FireServer()\nReplicatedStorage.Purchase.OnServerEvent:Connect(function() end)"}
+  ]
+}

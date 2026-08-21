@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RoGraph</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.33.1/dist/cytoscape.min.js"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="RoGraph home"><span class="brand-mark">R</span><span>RoGraph</span></a>
+        <label class="project-picker"><span>PROJECT</span><select id="project-select" aria-label="Project"></select></label>
+        <label class="search"><span class="search-icon">⌕</span><input id="search-input" type="search" placeholder="Search scripts, remotes, paths…" autocomplete="off" /></label>
+        <button class="icon-button" id="fit-button" title="Fit graph" aria-label="Fit graph">⛶</button>
+      </header>
+
+      <aside class="sidebar">
+        <section>
+          <div class="section-heading"><span>NODE TYPES</span><button id="all-types" class="text-button">ALL</button></div>
+          <div id="node-filters" class="filter-list"></div>
+        </section>
+        <section>
+          <div class="section-heading"><span>EDGE TYPES</span><button id="all-edges" class="text-button">ALL</button></div>
+          <div id="edge-filters" class="filter-list"></div>
+        </section>
+        <section class="layout-section">
+          <label class="section-heading" for="layout-select">LAYOUT</label>
+          <select id="layout-select" class="layout-select">
+            <option value="cose">Force</option><option value="breadthfirst">Hierarchy</option><option value="circle">Circle</option><option value="grid">Grid</option>
+          </select>
+        </section>
+        <section class="legend"><div class="section-heading">LEGEND</div><p><span class="legend-dot module"></span>ModuleScript <span class="legend-dot remote"></span>Remote <span class="legend-dot service"></span>Service</p></section>
+      </aside>
+
+      <section class="canvas-wrap">
+        <div id="empty-state" class="empty-state"><div class="empty-orb"></div><h1>Waiting for a project</h1><p>Start RoGraph, then index a place from the Studio plugin.</p></div>
+        <div id="cy" aria-label="Project knowledge graph"></div>
+        <div id="graph-stats" class="graph-stats"></div>
+      </section>
+
+      <aside id="detail-panel" class="detail-panel is-hidden">
+        <button id="close-panel" class="close-button" aria-label="Close details">×</button>
+        <div class="eyebrow" id="detail-type"></div><h2 id="detail-name"></h2><p class="path" id="detail-path"></p>
+        <div class="detail-grid"><div><span>INCOMING</span><strong id="incoming-count">0</strong></div><div><span>OUTGOING</span><strong id="outgoing-count">0</strong></div></div>
+        <section><h3>RELATIONSHIPS</h3><ul id="relationships" class="relationship-list"></ul></section>
+        <section id="source-section"><h3>SOURCE PREVIEW</h3><pre id="source-preview"></pre></section>
+      </aside>
+    </main>
+    <script src="/static/graph.js"></script>
+  </body>
+</html>
