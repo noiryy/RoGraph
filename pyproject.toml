@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "roblox-graph"
+version = "0.1.0"
+description = "Local-first Roblox Studio knowledge graph and MCP backend."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "pydantic>=2.9",
+  "uvicorn[standard]>=0.32",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28",
+  "mypy>=1.13",
+  "pytest>=8.3",
+  "ruff>=0.8",
+]
+
+[project.scripts]
+roblox-graph = "roblox_graph.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/roblox_graph"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+files = ["src"]
+python_version = "3.11"
+warn_unused_configs = true
