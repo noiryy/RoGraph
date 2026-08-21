@@ -1,10 +1,15 @@
-const palette = { Script: '#6fa9ff', LocalScript: '#62c5eb', ModuleScript: '#9b8cff', RemoteEvent: '#f5a66b', RemoteFunction: '#f2bc6f', Service: '#54d6ba', DataStore: '#e889cc', OrderedDataStore: '#e889cc', CollectionServiceTag: '#d6d06f', Attribute: '#e887a1', Folder: '#93a4c0', Model: '#88b9a1', Place: '#ffffff', RobloxInstance: '#93a4c0' };
+const palette = { Script: '#ff676f', LocalScript: '#ff8590', ModuleScript: '#fb7185', RemoteEvent: '#ff9d65', RemoteFunction: '#ffc16b', Service: '#f3c85a', DataStore: '#df6bab', OrderedDataStore: '#df6bab', CollectionServiceTag: '#c9a6ff', Attribute: '#e87fae', Folder: '#b99ba1', Model: '#c9a37b', Place: '#ffeff0', RobloxInstance: '#b99ba1' };
+const THEME_STORAGE_KEY = 'rograph.theme';
 let cy; let graphData = { nodes: [], edges: [] }; let activeTypes = new Set(); let activeEdges = new Set();
 const el = (id) => document.getElementById(id);
 
 async function api(path) { const response = await fetch(path); if (!response.ok) throw new Error(await response.text()); return response.json(); }
 function escape(value) { return String(value ?? '').replace(/[&<>"']/g, (letter) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[letter])); }
 function setEmpty(visible, message) { const state = el('empty-state'); state.classList.toggle('is-hidden', !visible); if (message) state.querySelector('p').textContent = message; }
+function graphTheme() { const style = getComputedStyle(document.documentElement); return { accent: style.getPropertyValue('--accent').trim(), edge: style.getPropertyValue('--graph-edge').trim(), label: style.getPropertyValue('--node-label').trim(), surface: style.getPropertyValue('--surface').trim() }; }
+function updateThemeControl() { const dark = document.documentElement.dataset.theme === 'dark'; const button = el('theme-toggle'); el('theme-icon').textContent = dark ? '☼' : '☾'; button.title = dark ? 'Switch to light mode' : 'Switch to dark mode'; button.setAttribute('aria-label', button.title); }
+function applyTheme(theme, persist = true) { document.documentElement.dataset.theme = theme; if (persist) localStorage.setItem(THEME_STORAGE_KEY, theme); updateThemeControl(); if (cy) { makeGraph(); applyFilters(); } }
+function toggleTheme() { applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); }
 
 function populateFilters() {
   const types = [...new Set(graphData.nodes.map((node) => node.type))].sort(); const edges = [...new Set(graphData.edges.map((edge) => edge.type))].sort();
@@ -19,16 +24,17 @@ function applyFilters() {
   if (!cy) return; const visibleNodes = cy.nodes().filter((node) => activeTypes.has(node.data('type'))); cy.elements().hide(); visibleNodes.show(); visibleNodes.connectedEdges().filter((edge) => activeEdges.has(edge.data('type')) && edge.source().visible() && edge.target().visible()).show();
 }
 function makeGraph() {
+  const theme = graphTheme();
   const elements = [
     ...graphData.nodes.map((node) => ({ data: { ...node, label: node.name, color: palette[node.type] || '#91a0b9' } })),
     ...graphData.edges.map((edge) => ({ data: { ...edge, source: edge.source_id, target: edge.target_id } })),
   ];
   if (cy) cy.destroy();
   cy = cytoscape({ container: el('cy'), elements, wheelSensitivity: .18, style: [
-    { selector: 'node', style: { 'background-color':'data(color)', label:'data(label)', color:'#dbe6fb', 'font-size':9, 'text-valign':'bottom', 'text-margin-y':5, width: 'mapData(degree, 0, 20, 18, 38)', height: 'mapData(degree, 0, 20, 18, 38)', 'border-width':1, 'border-color':'#b9c6de55', 'overlay-opacity':0 } },
+    { selector: 'node', style: { 'background-color':'data(color)', label:'data(label)', color:theme.label, 'font-size':9, 'text-valign':'bottom', 'text-margin-y':5, width: 'mapData(degree, 0, 20, 18, 38)', height: 'mapData(degree, 0, 20, 18, 38)', 'border-width':1, 'border-color':theme.surface, 'overlay-opacity':0 } },
     { selector: 'node[type = "ModuleScript"]', style: { shape:'round-rectangle' } }, { selector: 'node[type = "RemoteEvent"], node[type = "RemoteFunction"]', style: { shape:'diamond' } }, { selector: 'node[type = "Service"]', style: { shape:'hexagon' } },
-    { selector: 'edge', style: { width:1, 'line-color':'#536583', 'target-arrow-color':'#536583', 'target-arrow-shape':'triangle', 'curve-style':'bezier', opacity:.62 } },
-    { selector: '.focused', style: { 'border-width':3, 'border-color':'#ffffff', 'z-index':9 } }, { selector: '.neighbour', style: { 'border-width':2, 'border-color':'#aebdff', opacity:1 } }, { selector: '.faded', style: { opacity:.11 } }, { selector: '.selected-edge', style: { width:2.5, 'line-color':'#aebdff', 'target-arrow-color':'#aebdff', opacity:1 } },
+    { selector: 'edge', style: { width:1, 'line-color':theme.edge, 'target-arrow-color':theme.edge, 'target-arrow-shape':'triangle', 'curve-style':'bezier', opacity:.62 } },
+    { selector: '.focused', style: { 'border-width':3, 'border-color':theme.label, 'z-index':9 } }, { selector: '.neighbour', style: { 'border-width':2, 'border-color':theme.accent, opacity:1 } }, { selector: '.faded', style: { opacity:.11 } }, { selector: '.selected-edge', style: { width:2.5, 'line-color':theme.accent, 'target-arrow-color':theme.accent, opacity:1 } },
   ], layout: { name:'cose', animate:false, idealEdgeLength:100, nodeRepulsion:6000, gravity:.14, padding:46 } });
   cy.nodes().forEach((node) => node.data('degree', node.degree()));
   cy.on('tap', 'node', (event) => focusNode(event.target)); cy.on('mouseover', 'node', (event) => highlight(event.target)); cy.on('mouseout', 'node', () => clearHighlight()); cy.on('tap', (event) => { if (event.target === cy) { clearHighlight(); el('detail-panel').classList.add('is-hidden'); } });
@@ -45,5 +51,38 @@ function runLayout() { if (!cy) return; const name = el('layout-select').value; 
 async function search() { const query = el('search-input').value.trim(); const projectId = el('project-select').value; if (!query || !projectId) return; const data = await api(`/api/search?project_id=${encodeURIComponent(projectId)}&query=${encodeURIComponent(query)}`); if (data.results[0] && cy) focusNode(cy.getElementById(data.results[0].id)); }
 async function loadProject(projectId) { if (!projectId) { setEmpty(true); return; } const [data, overview] = await Promise.all([api(`/api/graph?project_id=${encodeURIComponent(projectId)}`), api(`/api/projects/${encodeURIComponent(projectId)}/overview`)]); graphData = data; setEmpty(!data.nodes.length, data.nodes.length ? '' : 'This project has no architectural nodes yet.'); populateFilters(); makeGraph(); el('graph-stats').textContent = `${data.nodes.length.toLocaleString()} nodes · ${data.edges.length.toLocaleString()} edges · ${overview.community_count} areas`; }
 function connectUpdates() { const protocol = location.protocol === 'https:' ? 'wss' : 'ws'; const socket = new WebSocket(`${protocol}://${location.host}/ws/graph`); socket.onmessage = async (message) => { const event = JSON.parse(message.data); if (event.project_id === el('project-select').value) await loadProject(event.project_id); }; socket.onclose = () => window.setTimeout(connectUpdates, 1_000); }
-async function init() { try { const { projects } = await api('/api/projects'); const select = el('project-select'); projects.forEach((project) => { const option = document.createElement('option'); option.value = project.id; option.textContent = project.name; select.append(option); }); select.addEventListener('change', () => loadProject(select.value)); el('search-input').addEventListener('keydown', (event) => { if (event.key === 'Enter') search(); }); el('fit-button').addEventListener('click', () => cy?.fit(undefined, 42)); el('close-panel').addEventListener('click', () => { el('detail-panel').classList.add('is-hidden'); clearHighlight(); }); el('layout-select').addEventListener('change', runLayout); el('all-types').addEventListener('click', () => { activeTypes = new Set(graphData.nodes.map((node) => node.type)); document.querySelectorAll('#node-filters input').forEach((input) => input.checked = true); applyFilters(); }); el('all-edges').addEventListener('click', () => { activeEdges = new Set(graphData.edges.map((edge) => edge.type)); document.querySelectorAll('#edge-filters input').forEach((input) => input.checked = true); applyFilters(); }); await loadProject(select.value); connectUpdates(); } catch (error) { console.error(error); setEmpty(true, 'Unable to load the local graph. Is RoGraph running?'); } }
+async function init() {
+  try {
+    applyTheme(document.documentElement.dataset.theme || 'dark', false);
+    const { projects } = await api('/api/projects');
+    const select = el('project-select');
+    projects.forEach((project) => {
+      const option = document.createElement('option');
+      option.value = project.id;
+      option.textContent = project.name;
+      select.append(option);
+    });
+    select.addEventListener('change', () => loadProject(select.value));
+    el('search-input').addEventListener('keydown', (event) => { if (event.key === 'Enter') search(); });
+    el('theme-toggle').addEventListener('click', toggleTheme);
+    el('fit-button').addEventListener('click', () => cy?.fit(undefined, 42));
+    el('close-panel').addEventListener('click', () => { el('detail-panel').classList.add('is-hidden'); clearHighlight(); });
+    el('layout-select').addEventListener('change', runLayout);
+    el('all-types').addEventListener('click', () => {
+      activeTypes = new Set(graphData.nodes.map((node) => node.type));
+      document.querySelectorAll('#node-filters input').forEach((input) => input.checked = true);
+      applyFilters();
+    });
+    el('all-edges').addEventListener('click', () => {
+      activeEdges = new Set(graphData.edges.map((edge) => edge.type));
+      document.querySelectorAll('#edge-filters input').forEach((input) => input.checked = true);
+      applyFilters();
+    });
+    await loadProject(select.value);
+    connectUpdates();
+  } catch (error) {
+    console.error(error);
+    setEmpty(true, 'Unable to load the local graph. Is RoGraph running?');
+  }
+}
 init();
