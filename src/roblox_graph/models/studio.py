@@ -19,6 +19,9 @@ class StudioInstance(BaseModel):
     # instead of rejecting the entire Studio snapshot.
     name: str = Field(max_length=256)
     class_name: str = Field(max_length=256, alias="className")
+    instance_class_name: str | None = Field(
+        default=None, max_length=256, alias="instanceClassName"
+    )
     path: str = Field(min_length=1, max_length=2048)
     parent_path: str | None = Field(default=None, max_length=2048, alias="parentPath")
     studio_id: str | None = Field(default=None, max_length=512, alias="id")

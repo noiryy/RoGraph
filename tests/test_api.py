@@ -136,3 +136,39 @@ def test_graph_view_omits_source_by_default_and_caps_preview_edges(tmp_path) -> 
     assert len(preview["edges"]) == 1
     assert preview["edges"][0]["type"] == "REQUIRES"
     assert next(node for node in full["nodes"] if node["id"] == first.id)["source"]
+
+
+def test_client_ui_lens_returns_only_client_and_ui_nodes(tmp_path) -> None:
+    app = create_app(Settings(database_path=tmp_path / "graph.db"))
+    repository = app.state.repository
+    project = Project(id="place:lens", name="Lens")
+    repository.upsert_project(project)
+    client_script = Node.create(
+        project_id=project.id,
+        type="LocalScript",
+        name="MenuController",
+        path="StarterGui.MenuController",
+        metadata={"execution_context": "client", "ui_component": False},
+    )
+    ui_component = Node.create(
+        project_id=project.id,
+        type="UIComponent",
+        name="Play",
+        path="StarterGui.Play",
+        metadata={"execution_context": "client", "ui_component": True},
+    )
+    server_script = Node.create(
+        project_id=project.id,
+        type="Script",
+        name="RoundService",
+        path="ServerScriptService.RoundService",
+        metadata={"execution_context": "server", "ui_component": False},
+    )
+    for node in (client_script, ui_component, server_script):
+        repository.upsert_node(node)
+
+    response = TestClient(app).get(
+        "/api/graph", params={"project_id": project.id, "lens": "client_ui"}
+    )
+
+    assert {node["name"] for node in response.json()["nodes"]} == {"MenuController", "Play"}

@@ -23,7 +23,11 @@ _TYPE_BY_CLASS_NAME = {
     "BindableFunction": "BindableFunction",
     "Folder": "Folder",
     "Model": "Model",
+    "UIComponent": "UIComponent",
 }
+
+_CLIENT_ROOTS = ("StarterPlayer", "StarterGui", "StarterPack")
+_SERVER_ROOTS = ("ServerScriptService", "ServerStorage")
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,20 +173,31 @@ class StudioIngestionService:
         if instance.source is not None:
             source_hash = hashlib.sha256(instance.source.encode("utf-8")).hexdigest()
         node_type = "Service" if instance.is_service else _TYPE_BY_CLASS_NAME[instance.class_name]
+        execution_context = StudioIngestionService._execution_context(instance)
         return Node.create(
             project_id=project_id,
             type=node_type,
             name=instance.name,
             path=instance.path,
             metadata={
-                "class_name": instance.class_name,
+                "class_name": instance.instance_class_name or instance.class_name,
+                "execution_context": execution_context,
                 "studio_id": instance.studio_id,
                 "attributes": instance.attributes,
                 "tags": instance.tags,
+                "ui_component": instance.class_name == "UIComponent",
             },
             source=instance.source,
             source_hash=source_hash,
         )
+
+    @staticmethod
+    def _execution_context(instance: StudioInstance) -> str:
+        if instance.class_name == "LocalScript" or instance.path.startswith(_CLIENT_ROOTS):
+            return "client"
+        if instance.path.startswith(_SERVER_ROOTS):
+            return "server"
+        return "shared"
 
     @staticmethod
     def _deduplicate_nodes(nodes: list[Node]) -> list[Node]:

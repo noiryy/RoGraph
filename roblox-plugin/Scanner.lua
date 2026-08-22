@@ -7,6 +7,8 @@ local Serializer = require(script.Parent.Serializer)
 
 local Scanner = {}
 
+local StarterGui = game:GetService("StarterGui")
+
 local architecturalClasses = {
 	Script = true,
 	LocalScript = true,
@@ -19,10 +21,19 @@ local architecturalClasses = {
 	Model = true,
 }
 
+local function isUiComponent(instance: Instance): boolean
+	return instance:IsDescendantOf(StarterGui)
+		and (instance:IsA("GuiBase2d") or instance:IsA("UIBase"))
+end
+
 function Scanner.isArchitectural(instance: Instance): boolean
 	return instance.Name ~= ""
 		and instance.ClassName ~= ""
-		and (instance.Parent == game or architecturalClasses[instance.ClassName] == true)
+		and (
+			instance.Parent == game
+			or architecturalClasses[instance.ClassName] == true
+			or isUiComponent(instance)
+		)
 end
 
 function Scanner.record(instance: Instance)
@@ -34,10 +45,13 @@ function Scanner.record(instance: Instance)
 		tags = result
 	end
 
+	local uiComponent = isUiComponent(instance)
+
 	return {
 		id = Serializer.debugId(instance),
 		name = instance.Name,
-		className = instance.ClassName,
+		className = if uiComponent then "UIComponent" else instance.ClassName,
+		instanceClassName = instance.ClassName,
 		path = instance:GetFullName(),
 		parentPath = if instance.Parent == game then "game" else instance.Parent:GetFullName(),
 		isService = instance.Parent == game,

@@ -46,13 +46,24 @@ def get_graph(
     order: Literal["name", "connected"] = "name",
     edge_limit: int | None = Query(default=None, ge=1, le=20_000),
     include_source: bool = False,
+    lens: Literal["all", "client_ui"] = "all",
 ) -> dict[str, object]:
     repository = request.app.state.repository
-    nodes = (
-        repository.list_nodes_by_connectivity(project_id, limit=limit)
-        if order == "connected"
-        else repository.list_nodes(project_id, limit=limit)
-    )
+    if lens == "client_ui":
+        nodes = [
+            node
+            for node in repository.list_nodes(project_id)
+            if node.metadata.get("execution_context") == "client"
+            or node.metadata.get("ui_component") is True
+            or node.type == "LocalScript"
+            or (node.path or "").startswith(("StarterPlayer", "StarterGui", "StarterPack"))
+        ][:limit]
+    else:
+        nodes = (
+            repository.list_nodes_by_connectivity(project_id, limit=limit)
+            if order == "connected"
+            else repository.list_nodes(project_id, limit=limit)
+        )
     node_ids = {node.id for node in nodes}
     edges = [
         edge

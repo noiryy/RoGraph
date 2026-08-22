@@ -93,6 +93,75 @@ def test_snapshot_accepts_and_skips_unnamed_roblox_instances(tmp_path: Path) -> 
     assert all(node["name"] for node in graph["nodes"])
 
 
+def test_snapshot_indexes_client_scripts_and_ui_components(tmp_path: Path) -> None:
+    app = create_app(Settings(database_path=tmp_path / "graph.db"))
+    client = TestClient(app)
+    snapshot = {
+        "project": {"id": "place:ui", "name": "UiPlace"},
+        "instances": [
+            {
+                "id": "starter-gui",
+                "name": "StarterGui",
+                "className": "StarterGui",
+                "path": "StarterGui",
+                "parentPath": "game",
+                "isService": True,
+            },
+            {
+                "id": "main-menu",
+                "name": "MainMenu",
+                "className": "UIComponent",
+                "instanceClassName": "ScreenGui",
+                "path": "StarterGui.MainMenu",
+                "parentPath": "StarterGui",
+            },
+            {
+                "id": "play-button",
+                "name": "Play",
+                "className": "UIComponent",
+                "instanceClassName": "TextButton",
+                "path": "StarterGui.MainMenu.Play",
+                "parentPath": "StarterGui.MainMenu",
+            },
+            {
+                "id": "button-layout",
+                "name": "ButtonLayout",
+                "className": "UIComponent",
+                "instanceClassName": "UIListLayout",
+                "path": "StarterGui.MainMenu.ButtonLayout",
+                "parentPath": "StarterGui.MainMenu",
+            },
+            {
+                "id": "menu-controller",
+                "name": "MenuController",
+                "className": "LocalScript",
+                "path": "StarterGui.MainMenu.MenuController",
+                "parentPath": "StarterGui.MainMenu",
+                "source": "script.Parent.Play.Activated:Connect(function() end)",
+            },
+        ],
+    }
+
+    response = client.post("/api/studio/snapshot", json=snapshot)
+
+    assert response.status_code == 202
+    graph = client.get(
+        "/api/graph", params={"project_id": "place:ui", "include_source": True}
+    ).json()
+    by_name = {node["name"]: node for node in graph["nodes"]}
+    assert by_name["Play"]["type"] == "UIComponent"
+    assert by_name["Play"]["metadata"] == {
+        "attributes": {},
+        "class_name": "TextButton",
+        "execution_context": "client",
+        "studio_id": "play-button",
+        "tags": [],
+        "ui_component": True,
+    }
+    assert by_name["MenuController"]["metadata"]["execution_context"] == "client"
+    assert by_name["ButtonLayout"]["metadata"]["class_name"] == "UIListLayout"
+
+
 def test_studio_events_update_and_remove_a_node_with_websocket_notification(tmp_path: Path) -> None:
     app = create_app(Settings(database_path=tmp_path / "graph.db"))
     client = TestClient(app)

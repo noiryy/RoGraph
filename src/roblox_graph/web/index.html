@@ -12,7 +12,7 @@
         } catch (_) { document.documentElement.dataset.theme = 'dark'; }
       })();
     </script>
-    <link rel="stylesheet" href="/static/styles.css?v=20260822-graph-redesign-10" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260822-graph-redesign-11" />
     <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.33.1/dist/cytoscape.min.js"></script>
   </head>
   <body>
@@ -37,6 +37,12 @@
           <div id="edge-filters" class="filter-list"></div>
         </section>
         <section class="layout-section">
+          <label class="section-heading" for="lens-select">GRAPH LENS</label>
+          <select id="lens-select" class="layout-select">
+            <option value="overview">Architecture overview</option><option value="client_ui">Client &amp; UI</option>
+          </select>
+        </section>
+        <section class="layout-section">
           <label class="section-heading" for="layout-select">LAYOUT</label>
           <select id="layout-select" class="layout-select">
             <option value="circle">Constellation</option><option value="cose">Force</option><option value="breadthfirst">Hierarchy</option><option value="grid">Grid</option>
@@ -59,6 +65,6 @@
         <section id="source-section"><h3>SOURCE PREVIEW</h3><pre id="source-preview"></pre></section>
       </aside>
     </main>
-    <script src="/static/graph.js?v=20260822-graph-redesign-10"></script>
+    <script src="/static/graph.js?v=20260822-graph-redesign-11"></script>
   </body>
 </html>

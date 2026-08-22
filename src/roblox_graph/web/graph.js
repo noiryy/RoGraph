@@ -6,6 +6,7 @@ const OVERVIEW_EDGE_LIMIT = 400;
 const OVERVIEW_RENDER_LIMIT = 90;
 let cy; let graphData = { nodes: [], edges: [] }; let activeTypes = new Set(); let activeEdges = new Set();
 let showingOverview = false;
+let activeLens = 'overview';
 let renderedNodeCount = 0;
 const el = (id) => document.getElementById(id);
 
@@ -37,10 +38,19 @@ function makeGraph() {
     degrees.set(edge.source_id, (degrees.get(edge.source_id) || 0) + 1);
     degrees.set(edge.target_id, (degrees.get(edge.target_id) || 0) + 1);
   });
+  const candidateNodes = activeLens === 'client_ui'
+    ? graphData.nodes.filter((node) => degrees.has(node.id) || node.type === 'LocalScript' || node.type === 'UIComponent')
+    : graphData.nodes.filter((node) => degrees.has(node.id));
   const visibleNodes = compact
-    ? graphData.nodes
-      .filter((node) => degrees.has(node.id))
-      .sort((left, right) => (degrees.get(right.id) || 0) - (degrees.get(left.id) || 0) || left.id.localeCompare(right.id))
+    ? candidateNodes
+      .sort((left, right) => {
+        const lensScore = (node) => activeLens === 'client_ui'
+          ? (node.type === 'UIComponent' ? 3 : node.type === 'LocalScript' ? 2 : 1)
+          : 0;
+        return lensScore(right) - lensScore(left)
+          || (degrees.get(right.id) || 0) - (degrees.get(left.id) || 0)
+          || left.id.localeCompare(right.id);
+      })
       .slice(0, OVERVIEW_RENDER_LIMIT)
     : graphData.nodes;
   const visibleNodeIds = new Set(visibleNodes.map((node) => node.id));
@@ -83,16 +93,23 @@ async function search() { const query = el('search-input').value.trim(); const p
 async function loadProject(projectId) {
   if (!projectId) { setEmpty(true); return; }
   const overview = await api(`/api/projects/${encodeURIComponent(projectId)}/overview`);
-  showingOverview = overview.nodes > LARGE_GRAPH_THRESHOLD;
+  const clientUiLens = activeLens === 'client_ui';
+  showingOverview = overview.nodes > LARGE_GRAPH_THRESHOLD || clientUiLens;
   el('layout-select').value = showingOverview ? 'circle' : 'cose';
   const params = new URLSearchParams({ project_id: projectId });
-  if (showingOverview) { params.set('limit', OVERVIEW_NODE_LIMIT); params.set('edge_limit', OVERVIEW_EDGE_LIMIT); params.set('order', 'connected'); }
+  if (clientUiLens) {
+    params.set('lens', 'client_ui'); params.set('limit', OVERVIEW_NODE_LIMIT); params.set('edge_limit', OVERVIEW_EDGE_LIMIT);
+  } else if (showingOverview) {
+    params.set('limit', OVERVIEW_NODE_LIMIT); params.set('edge_limit', OVERVIEW_EDGE_LIMIT); params.set('order', 'connected');
+  }
   const data = await api(`/api/graph?${params}`);
   graphData = data;
   setEmpty(!data.nodes.length, data.nodes.length ? '' : 'This project has no architectural nodes yet.');
   populateFilters(); makeGraph();
   el('graph-stats').textContent = showingOverview
-    ? `Showing ${renderedNodeCount.toLocaleString()} key nodes of ${overview.nodes.toLocaleString()} · optimized overview · ${overview.community_count} areas`
+    ? clientUiLens
+      ? `Showing ${renderedNodeCount.toLocaleString()} Client & UI nodes · focused lens`
+      : `Showing ${renderedNodeCount.toLocaleString()} key nodes of ${overview.nodes.toLocaleString()} · optimized overview · ${overview.community_count} areas`
     : `${data.nodes.length.toLocaleString()} nodes · ${data.edges.length.toLocaleString()} edges · ${overview.community_count} areas`;
 }
 function connectUpdates() { const protocol = location.protocol === 'https:' ? 'wss' : 'ws'; const socket = new WebSocket(`${protocol}://${location.host}/ws/graph`); socket.onmessage = async (message) => { const event = JSON.parse(message.data); if (event.project_id === el('project-select').value) await loadProject(event.project_id); }; socket.onclose = () => window.setTimeout(connectUpdates, 1_000); }
@@ -108,6 +125,7 @@ async function init() {
       select.append(option);
     });
     select.addEventListener('change', () => loadProject(select.value));
+    el('lens-select').addEventListener('change', (event) => { activeLens = event.target.value; loadProject(select.value); });
     el('search-input').addEventListener('keydown', (event) => { if (event.key === 'Enter') search(); });
     el('theme-toggle').addEventListener('click', toggleTheme);
     el('fit-button').addEventListener('click', () => cy?.fit(undefined, 42));
