@@ -5,12 +5,13 @@ const OVERVIEW_NODE_LIMIT = 200;
 const OVERVIEW_EDGE_LIMIT = 400;
 let cy; let graphData = { nodes: [], edges: [] }; let activeTypes = new Set(); let activeEdges = new Set();
 let showingOverview = false;
+let renderedNodeCount = 0;
 const el = (id) => document.getElementById(id);
 
 async function api(path) { const response = await fetch(path); if (!response.ok) throw new Error(await response.text()); return response.json(); }
 function escape(value) { return String(value ?? '').replace(/[&<>"']/g, (letter) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[letter])); }
 function setEmpty(visible, message) { const state = el('empty-state'); state.classList.toggle('is-hidden', !visible); if (message) state.querySelector('p').textContent = message; }
-function graphTheme() { const style = getComputedStyle(document.documentElement); return { accent: style.getPropertyValue('--accent').trim(), edge: style.getPropertyValue('--graph-edge').trim(), label: style.getPropertyValue('--node-label').trim(), surface: style.getPropertyValue('--surface').trim() }; }
+function graphTheme() { const style = getComputedStyle(document.documentElement); return { accent: style.getPropertyValue('--accent').trim(), edge: style.getPropertyValue('--graph-edge').trim(), label: style.getPropertyValue('--node-label').trim(), surface: style.getPropertyValue('--surface').trim(), background: style.getPropertyValue('--bg').trim() }; }
 function updateThemeControl() { const dark = document.documentElement.dataset.theme === 'dark'; const button = el('theme-toggle'); el('theme-icon').textContent = dark ? '☼' : '☾'; button.title = dark ? 'Switch to light mode' : 'Switch to dark mode'; button.setAttribute('aria-label', button.title); }
 function applyTheme(theme, persist = true) { document.documentElement.dataset.theme = theme; if (persist) localStorage.setItem(THEME_STORAGE_KEY, theme); updateThemeControl(); if (cy) { makeGraph(); applyFilters(); } }
 function toggleTheme() { applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); }
@@ -35,20 +36,31 @@ function makeGraph() {
     degrees.set(edge.source_id, (degrees.get(edge.source_id) || 0) + 1);
     degrees.set(edge.target_id, (degrees.get(edge.target_id) || 0) + 1);
   });
+  const visibleNodes = compact
+    ? graphData.nodes.filter((node) => degrees.has(node.id))
+    : graphData.nodes;
+  renderedNodeCount = visibleNodes.length;
   const elements = [
-    ...graphData.nodes.map((node) => ({ data: { ...node, degree: degrees.get(node.id) || 0, label: compact ? '' : node.name, color: palette[node.type] || '#91a0b9' } })),
-    ...graphData.edges.map((edge) => ({ data: { ...edge, source: edge.source_id, target: edge.target_id } })),
+    ...visibleNodes.map((node) => {
+      const degree = degrees.get(node.id) || 0;
+      const label = compact && degree < 15 ? '' : node.name;
+      return { data: { ...node, degree, label, color: palette[node.type] || '#91a0b9' }, classes: compact ? 'overview-node' : '' };
+    }),
+    ...graphData.edges.map((edge) => ({ data: { ...edge, source: edge.source_id, target: edge.target_id }, classes: compact ? 'overview-edge' : '' })),
   ];
   if (cy) cy.destroy();
   cy = cytoscape({ container: el('cy'), elements, wheelSensitivity: .18, style: [
-    { selector: 'node', style: { 'background-color':'data(color)', label:'data(label)', color:theme.label, 'font-size':9, 'text-valign':'bottom', 'text-margin-y':5, width: 'mapData(degree, 0, 20, 18, 38)', height: 'mapData(degree, 0, 20, 18, 38)', 'border-width':1, 'border-color':theme.surface, 'overlay-opacity':0 } },
+    { selector: 'node', style: { 'background-color':'data(color)', label:'data(label)', color:theme.label, 'font-size':9, 'font-weight':600, 'text-valign':'bottom', 'text-margin-y':7, 'text-outline-width':2, 'text-outline-color':theme.background, width: 'mapData(degree, 0, 20, 15, 34)', height: 'mapData(degree, 0, 20, 15, 34)', 'border-width':1.5, 'border-color':theme.surface, 'overlay-opacity':0 } },
     { selector: 'node[type = "ModuleScript"]', style: { shape:'round-rectangle' } }, { selector: 'node[type = "RemoteEvent"], node[type = "RemoteFunction"]', style: { shape:'diamond' } }, { selector: 'node[type = "Service"]', style: { shape:'hexagon' } },
-    { selector: 'edge', style: { width:1, 'line-color':theme.edge, 'target-arrow-color':theme.edge, 'target-arrow-shape':'triangle', 'curve-style':'bezier', opacity:.62 } },
+    { selector: 'edge', style: { width:1, 'line-color':theme.edge, 'target-arrow-color':theme.edge, 'target-arrow-shape':'triangle', 'curve-style':'bezier', opacity:.5 } },
+    { selector: 'edge.overview-edge', style: { width:.75, 'target-arrow-shape':'none', 'curve-style':'unbundled-bezier', opacity:.26 } },
+    { selector: 'node.overview-node', style: { 'shadow-blur':10, 'shadow-color':'data(color)', 'shadow-opacity':.28, 'shadow-offset-x':0, 'shadow-offset-y':0 } },
     { selector: '.focused', style: { 'border-width':3, 'border-color':theme.label, 'z-index':9 } }, { selector: '.neighbour', style: { 'border-width':2, 'border-color':theme.accent, opacity:1 } }, { selector: '.faded', style: { opacity:.11 } }, { selector: '.selected-edge', style: { width:2.5, 'line-color':theme.accent, 'target-arrow-color':theme.accent, opacity:1 } },
   ], layout: compact
-    ? { name:'grid', animate:false, padding:46, avoidOverlap:true, condense:true }
+    ? { name:'cose', animate:false, numIter:250, idealEdgeLength:85, nodeRepulsion:9000, edgeElasticity:.14, gravity:.24, componentSpacing:80, padding:58 }
     : { name:'cose', animate:false, idealEdgeLength:100, nodeRepulsion:6000, gravity:.14, padding:46 } });
   cy.on('tap', 'node', (event) => focusNode(event.target)); cy.on('mouseover', 'node', (event) => highlight(event.target)); cy.on('mouseout', 'node', () => clearHighlight()); cy.on('tap', (event) => { if (event.target === cy) { clearHighlight(); el('detail-panel').classList.add('is-hidden'); } });
+  if (compact) cy.fit(undefined, 86);
 }
 function highlight(node) { cy.elements().addClass('faded'); node.removeClass('faded').addClass('focused'); node.neighborhood().removeClass('faded').addClass('neighbour'); node.connectedEdges().addClass('selected-edge'); }
 function clearHighlight() { cy.elements().removeClass('faded focused neighbour selected-edge'); }
@@ -59,7 +71,7 @@ async function focusNode(node) {
   const fullNode = data.source ? data : await api(`/api/nodes/${encodeURIComponent(data.id)}`);
   const source = fullNode.source || ''; el('source-section').style.display = source ? 'block' : 'none'; el('source-preview').textContent = source.slice(0, 1400); el('detail-panel').classList.remove('is-hidden');
 }
-function runLayout() { if (!cy) return; const selected = el('layout-select').value; const name = showingOverview && selected === 'cose' ? 'grid' : selected; cy.layout({ name, animate:!showingOverview, animationDuration:350, padding:45, spacingFactor:1.1, avoidOverlap:true, directed:true, roots: cy.nodes().filter((node) => node.data('type') === 'Place') }).run(); }
+function runLayout() { if (!cy) return; const name = el('layout-select').value; cy.layout({ name, animate:!showingOverview, animationDuration:350, padding:45, spacingFactor:1.1, avoidOverlap:true, directed:true, roots: cy.nodes().filter((node) => node.data('type') === 'Place') }).run(); }
 async function search() { const query = el('search-input').value.trim(); const projectId = el('project-select').value; if (!query || !projectId) return; const data = await api(`/api/search?project_id=${encodeURIComponent(projectId)}&query=${encodeURIComponent(query)}`); if (data.results[0] && cy) focusNode(cy.getElementById(data.results[0].id)); }
 async function loadProject(projectId) {
   if (!projectId) { setEmpty(true); return; }
@@ -72,7 +84,7 @@ async function loadProject(projectId) {
   setEmpty(!data.nodes.length, data.nodes.length ? '' : 'This project has no architectural nodes yet.');
   populateFilters(); makeGraph();
   el('graph-stats').textContent = showingOverview
-    ? `Showing ${data.nodes.length.toLocaleString()} of ${overview.nodes.toLocaleString()} nodes · optimized overview · ${overview.community_count} areas`
+    ? `Showing ${renderedNodeCount.toLocaleString()} connected nodes of ${overview.nodes.toLocaleString()} · optimized overview · ${overview.community_count} areas`
     : `${data.nodes.length.toLocaleString()} nodes · ${data.edges.length.toLocaleString()} edges · ${overview.community_count} areas`;
 }
 function connectUpdates() { const protocol = location.protocol === 'https:' ? 'wss' : 'ws'; const socket = new WebSocket(`${protocol}://${location.host}/ws/graph`); socket.onmessage = async (message) => { const event = JSON.parse(message.data); if (event.project_id === el('project-select').value) await loadProject(event.project_id); }; socket.onclose = () => window.setTimeout(connectUpdates, 1_000); }
